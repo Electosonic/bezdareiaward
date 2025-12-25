@@ -9,7 +9,20 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ссылки можно оставить */
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  display: block;
+}
+
+/* ссылки */
 a {
   font-weight: 500;
   color: #bfa6ff;
@@ -19,21 +32,7 @@ a:hover {
   color: #d6c8ff;
 }
 
-/* ❗ ВАЖНО: body БОЛЬШЕ НЕ flex */
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  display: block;
-}
-
-/* заголовки — можно оставить */
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-/* кнопки — можно оставить */
+/* кнопки (можно оставить) */
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -44,11 +43,15 @@ button {
   cursor: pointer;
 }
 
-/* ❗ СБРОС root — чтобы ничего не смещало */
+/* ✅ САМЫЙ ВАЖНЫЙ БЛОК: #root центрирует всё приложение */
 #root {
   width: 100%;
   min-height: 100vh;
   margin: 0;
   padding: 0;
   max-width: none;
+
+  display: flex;
+  justify-content: center; /* центр по горизонтали */
+  align-items: flex-start; /* сверху, не по вертикали */
 }

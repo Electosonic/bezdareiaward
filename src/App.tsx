@@ -125,21 +125,20 @@ export default function App() {
   const canNext = step < ballot.length - 1;
   const hasUnsavedChange = !!selected && selected !== savedForNom;
 
-  // ================== СТИЛИ: “как на примере” ==================
+  // ================== СТИЛИ ==================
 
-  // page — на всю ширину, центрирует wrapper
   const pageStyle: React.CSSProperties = {
     minHeight: "100vh",
     width: "100%",
     display: "flex",
-    justifyContent: "center", // ВОТ оно — реальное центрирование всей колонки
+    justifyContent: "center",
     padding: "26px 16px 60px",
     fontFamily: "system-ui",
   };
 
-  // wrapper — ограниченная ширина, по центру экрана (как на другом сайте)
   const wrapperStyle: React.CSSProperties = {
     width: "min(920px, 100%)",
+    margin: "0 auto", // ✅ ВАЖНО: центрирует даже если flex где-то сломают
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -259,7 +258,6 @@ export default function App() {
   return (
     <div style={pageStyle}>
       <div style={wrapperStyle}>
-        {/* HEADER */}
         <div style={headerStyle}>
           <h1 style={{ margin: 0, fontSize: 32, letterSpacing: 0.6 }}>Bezdarei Award</h1>
           <div style={{ opacity: 0.75, marginTop: 6 }}>
@@ -294,10 +292,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* NOMINATION TITLE */}
         <h2 style={nominationTitleStyle}>{nomination.title}</h2>
 
-        {/* CARDS */}
         <div style={cardGridStyle}>
           {nomination.candidates.map((c) => {
             const active = selected === c.id;
@@ -309,7 +305,6 @@ export default function App() {
           })}
         </div>
 
-        {/* PANEL */}
         <div style={panelStyle}>
           <div style={{ opacity: 0.85, fontWeight: 700, textAlign: "center" }}>Выберите кандидата:</div>
 
@@ -389,7 +384,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* TOAST */}
         {toast ? (
           <div
             style={{
