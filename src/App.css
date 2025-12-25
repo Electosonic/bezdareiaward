@@ -1,6 +1,3 @@
-/* src/index.css (или App.css — где у тебя сейчас этот CSS) */
-
-/* базовые вещи, чтобы flex-центрирование работало предсказуемо */
 html,
 body {
   height: 100%;
@@ -8,53 +5,17 @@ body {
 
 body {
   margin: 0;
+
+  /* фон как на втором скрине */
+  background: radial-gradient(
+    1200px 600px at 50% 0%,
+    rgba(120, 60, 200, 0.25),
+    rgba(0, 0, 0, 0.9)
+  );
+
+  color: rgba(255, 255, 255, 0.92);
 }
 
-/* #root теперь отвечает за центрирование всей страницы */
-#root {
-  min-height: 100vh;
-  width: 100%;
-  display: flex;
-  justify-content: center;   /* центр по горизонтали */
-  align-items: flex-start;   /* сверху; поставь center, если хочешь по вертикали тоже */
-  padding: 24px 16px;        /* приятные отступы по краям */
+* {
   box-sizing: border-box;
-  text-align: center;
-}
-
-/* всё ниже можно оставить как было (не влияет на центрирование приложения) */
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }
