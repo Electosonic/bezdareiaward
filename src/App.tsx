@@ -24,15 +24,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
 
   const nomination = ballot[Math.max(0, Math.min(step, ballot.length - 1))];
-
-  // ✅ сохранённый голос (из базы) для текущей номинации
-  const savedId = nomination ? myVotes[nomination.id] ?? null : null;
-
-  // ✅ текущий локальный выбор (что сейчас кликнули)
-  const selectedId = selected;
-
-  // ✅ есть ли несохранённое изменение относительно базы
-  const hasUnsavedChange = !!selectedId && selectedId !== savedId;
+  const savedForNom = nomination ? myVotes[nomination.id] : undefined;
 
   // token из URL
   useEffect(() => {
@@ -79,10 +71,10 @@ export default function App() {
     loadMyVotes(token).catch(() => {});
   }, [token]);
 
-  // ✅ при смене шага — выставляем selected в сохранённый выбор (или null)
+  // при смене шага — выставляем selected в сохранённый выбор (или null)
   useEffect(() => {
-    setSelected(savedId ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const saved = nomination ? myVotes[nomination.id] : undefined;
+    setSelected(saved ?? null);
   }, [step, nomination?.id, myVotes]);
 
   async function saveVote(nomination_id: string, candidate_id: string) {
@@ -114,6 +106,7 @@ export default function App() {
 
   const canPrev = step > 0;
   const canNext = step < ballot.length - 1;
+  const hasUnsavedChange = !!selected && selected !== savedForNom;
 
   const containerStyle: React.CSSProperties = {
     maxWidth: 980,
@@ -130,7 +123,6 @@ export default function App() {
     marginBottom: 20,
   };
 
-  // ✅ карточка подсвечивается сохранённым голосом (если он есть), иначе — текущим выбором
   const cardStyle = (active: boolean): React.CSSProperties => ({
     borderRadius: 16,
     padding: 18,
@@ -154,19 +146,6 @@ export default function App() {
     background: "rgba(12, 8, 24, 0.55)",
     padding: 16,
   };
-
-  // безопасно, если nomination вдруг undefined
-  if (!nomination) {
-    return (
-      <div style={containerStyle}>
-        <h1 style={{ margin: 0 }}>Bezdarei Award</h1>
-        <div style={{ opacity: 0.8, marginTop: 8 }}>Бюллетень пустой.</div>
-      </div>
-    );
-  }
-
-  // ✅ что подсвечиваем визуально: сохранённый, если есть, иначе текущий выбор
-  const highlightedId = savedId ?? selectedId;
 
   return (
     <div style={containerStyle}>
@@ -211,7 +190,7 @@ export default function App() {
       {/* Карточки 2×2 */}
       <div style={cardGrid}>
         {nomination.candidates.map((c) => {
-          const active = highlightedId === c.id;
+          const active = selected === c.id;
           return (
             <div key={c.id} style={cardStyle(active)} onClick={() => setSelected(c.id)}>
               {c.title}
@@ -241,7 +220,7 @@ export default function App() {
               <input
                 type="radio"
                 name={`nom_${nomination.id}`}
-                checked={selectedId === c.id}
+                checked={selected === c.id}
                 onChange={() => setSelected(c.id)}
               />
               <span style={{ fontWeight: 600 }}>{c.title}</span>
@@ -251,21 +230,23 @@ export default function App() {
 
         {/* Статус сохранения */}
         <div style={{ marginTop: 12, opacity: 0.8 }}>
-          {!selectedId && !savedId ? (
-            <>
-              Статус: <b>нет выбора</b>
-            </>
-          ) : hasUnsavedChange ? (
+          {savedForNom ? (
+            hasUnsavedChange ? (
+              <>
+                Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
+              </>
+            ) : (
+              <>
+                Статус: <b>сохранено</b>
+              </>
+            )
+          ) : selected ? (
             <>
               Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
-            </>
-          ) : savedId ? (
-            <>
-              Статус: <b>сохранено</b>
             </>
           ) : (
             <>
-              Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
+              Статус: <b>нет выбора</b>
             </>
           )}
         </div>
@@ -280,8 +261,8 @@ export default function App() {
           </button>
 
           <button
-            disabled={!selectedId || !token || saving || !hasUnsavedChange && !!savedId}
-            onClick={() => saveVote(nomination.id, selectedId!)}
+            disabled={!selected || !token || saving}
+            onClick={() => saveVote(nomination.id, selected!)}
             style={{ padding: "10px 14px" }}
           >
             {saving ? "Сохраняю…" : "Сохранить голос"}
@@ -297,13 +278,9 @@ export default function App() {
 
           {!token ? (
             <div style={{ opacity: 0.8 }}>Чтобы голосовать, нужно войти.</div>
-          ) : selectedId ? (
+          ) : selected ? (
             <div style={{ opacity: 0.8 }}>
-              Текущий выбор: <b>{nomination.candidates.find((x) => x.id === selectedId)?.title ?? selectedId}</b>
-            </div>
-          ) : savedId ? (
-            <div style={{ opacity: 0.8 }}>
-              Ваш сохранённый выбор: <b>{nomination.candidates.find((x) => x.id === savedId)?.title ?? savedId}</b>
+              Текущий выбор: <b>{nomination.candidates.find((x) => x.id === selected)?.title ?? selected}</b>
             </div>
           ) : (
             <div style={{ opacity: 0.8 }}>Выберите кандидата</div>
