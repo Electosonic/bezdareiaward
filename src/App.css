@@ -1,10 +1,28 @@
+/* src/index.css (или App.css — где у тебя сейчас этот CSS) */
+
+/* базовые вещи, чтобы flex-центрирование работало предсказуемо */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+/* #root теперь отвечает за центрирование всей страницы */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;   /* центр по горизонтали */
+  align-items: flex-start;   /* сверху; поставь center, если хочешь по вертикали тоже */
+  padding: 24px 16px;        /* приятные отступы по краям */
+  box-sizing: border-box;
   text-align: center;
 }
 
+/* всё ниже можно оставить как было (не влияет на центрирование приложения) */
 .logo {
   height: 6em;
   padding: 1.5em;

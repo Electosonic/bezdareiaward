@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { ballot } from "./ballot";
 import { SITE_URL, WORKER_URL } from "./config";
@@ -130,16 +132,15 @@ export default function App() {
   const canNext = step < ballot.length - 1;
   const hasUnsavedChange = !!selected && selected !== savedForNom;
 
-  // ======= СТИЛИ (всё по центру) =======
+  // ======= СТИЛИ (контент по центру) =======
 
-  const containerStyle: React.CSSProperties = {
-    maxWidth: 980,
-    margin: "24px auto",
-    padding: 16,
-    fontFamily: "system-ui",
+  const contentStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 760, // ширина всей “колонки” по центру
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+    fontFamily: "system-ui",
   };
 
   const topPanelStyle: React.CSSProperties = {
@@ -171,7 +172,7 @@ export default function App() {
 
   const cardStyle = (active: boolean): React.CSSProperties => ({
     width: "100%",
-    maxWidth: 420,
+    maxWidth: 340, // чтобы карточки не растягивались странно
     borderRadius: 16,
     padding: 18,
     border: active ? "2px solid rgba(180, 140, 255, 0.9)" : "1px solid rgba(255,255,255,0.12)",
@@ -190,7 +191,7 @@ export default function App() {
 
   const panelStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: 640,
+    maxWidth: 620,
     borderRadius: 16,
     border: "1px solid rgba(255,255,255,0.12)",
     background: "rgba(12, 8, 24, 0.55)",
@@ -210,6 +211,7 @@ export default function App() {
 
   const radioItemStyle: React.CSSProperties = {
     width: "100%",
+    maxWidth: 560,
     display: "flex",
     justifyContent: "center",
     gap: 10,
@@ -231,18 +233,16 @@ export default function App() {
     textAlign: "center",
   };
 
-  // ======= UI =======
-
   if (!nomination) {
-    return <div style={containerStyle}>Нет данных ballot</div>;
+    return <div style={contentStyle}>Нет данных ballot</div>;
   }
 
   return (
-    <div style={containerStyle}>
+    <div style={contentStyle}>
       {/* Верхняя панель */}
       <div style={topPanelStyle}>
         <div>
-          <h1 style={{ margin: 0, textAlign: "center" }}>Bezdarei Award</h1>
+          <h1 style={{ margin: 0 }}>Bezdarei Award</h1>
           <div style={{ opacity: 0.75, marginTop: 6 }}>
             Вопрос {step + 1} из {ballot.length}
           </div>
