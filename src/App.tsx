@@ -10,6 +10,10 @@ type MyVotesResponse =
   | { ok: true; votes: { nomination_id: string; candidate_id: string }[] }
   | { ok: false; error: string };
 
+type ApiOk = { ok: true };
+type ApiErr = { ok: false; error: string };
+type UnvoteResponse = ApiOk | ApiErr;
+
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -20,19 +24,28 @@ export default function App() {
 
   const [myVotes, setMyVotes] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
+
+  // selected — локальный выбор, когда голосуем (пока не "зафиксировано")
   const [selected, setSelected] = useState<string | null>(null);
+
+  // locked — режим "голос зафиксирован, менять нельзя" (до нажатия "изменить голос")
+  const [locked, setLocked] = useState(false);
+
   const [saving, setSaving] = useState(false);
 
   const nomination = ballot[Math.max(0, Math.min(step, ballot.length - 1))];
 
-  // ✅ сохранённый голос (из базы) для текущей номинации
+  // сохранённый голос (из базы) для текущей номинации
   const savedId = nomination ? myVotes[nomination.id] ?? null : null;
 
-  // ✅ текущий локальный выбор (что сейчас кликнули)
-  const selectedId = selected;
+  // если голос сохранён — всегда подсвечиваем его (и блокируем)
+  const highlightedId = savedId ?? selected;
 
-  // ✅ есть ли несохранённое изменение относительно базы
-  const hasUnsavedChange = !!selectedId && selectedId !== savedId;
+  // можно ли менять выбор прямо сейчас
+  const canInteract = !!token && !saving && !locked;
+
+  // есть ли несохранённое изменение относительно базы
+  const hasUnsavedChange = !!selected && selected !== savedId;
 
   // token из URL
   useEffect(() => {
@@ -79,9 +92,19 @@ export default function App() {
     loadMyVotes(token).catch(() => {});
   }, [token]);
 
-  // ✅ при смене шага — выставляем selected в сохранённый выбор (или null)
+  // при смене шага — если уже голосовали: локальный selected = null, locked = true
+  // если не голосовали: selected = null (или можно оставить), locked = false
   useEffect(() => {
-    setSelected(savedId ?? null);
+    const currentSaved = nomination ? myVotes[nomination.id] ?? null : null;
+
+    // если есть сохранённый голос — блокируем и не даём "выбирать"
+    if (currentSaved) {
+      setLocked(true);
+      setSelected(null);
+    } else {
+      setLocked(false);
+      setSelected(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, nomination?.id, myVotes]);
 
@@ -103,9 +126,49 @@ export default function App() {
 
       // моментально обновим локально
       setMyVotes((prev) => ({ ...prev, [nomination_id]: candidate_id }));
-      setSelected(candidate_id);
+      setSelected(null);
 
-      // и синхронизируемся с базой (чтобы статус точно стал "сохранено")
+      // после голосования — блокируем
+      setLocked(true);
+
+      // синхронизируемся с базой
+      await loadMyVotes(token);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ⚠️ Для отмены голоса нужен endpoint.
+  // Я предполагаю, что у тебя есть POST `${WORKER_URL}/api/unvote` с body { nomination_id }
+  // Если у тебя другой путь — поменяй тут.
+  async function unvote(nomination_id: string) {
+    if (!token) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`${WORKER_URL}/api/unvote`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nomination_id }),
+      });
+
+      const data: UnvoteResponse = await r.json();
+      if (!data.ok) return alert(`Ошибка: ${data.error ?? "unknown"}`);
+
+      // локально убираем голос
+      setMyVotes((prev) => {
+        const next = { ...prev };
+        delete next[nomination_id];
+        return next;
+      });
+
+      // разблокируем и дадим выбирать заново
+      setLocked(false);
+      setSelected(null);
+
+      // синхронизируемся
       await loadMyVotes(token);
     } finally {
       setSaving(false);
@@ -130,14 +193,14 @@ export default function App() {
     marginBottom: 20,
   };
 
-  // ✅ карточка подсвечивается сохранённым голосом (если он есть), иначе — текущим выбором
-  const cardStyle = (active: boolean): React.CSSProperties => ({
+  const cardStyle = (active: boolean, dimmed: boolean, disabled: boolean): React.CSSProperties => ({
     borderRadius: 16,
     padding: 18,
-    border: active ? "2px solid rgba(180, 140, 255, 0.9)" : "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(20, 10, 40, 0.55)",
+    border: active ? "2px solid rgba(180, 140, 255, 0.95)" : "1px solid rgba(255,255,255,0.12)",
+    background: dimmed ? "rgba(160,160,160,0.14)" : "rgba(20, 10, 40, 0.55)",
     boxShadow: active ? "0 0 0 4px rgba(180,140,255,0.18)" : "none",
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: dimmed ? 0.55 : 1,
     minHeight: 170,
     display: "flex",
     alignItems: "center",
@@ -146,6 +209,9 @@ export default function App() {
     fontWeight: 700,
     lineHeight: 1.2,
     fontSize: 18,
+    userSelect: "none",
+    transition: "opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease",
+    transform: active ? "translateY(-1px)" : "none",
   });
 
   const panelStyle: React.CSSProperties = {
@@ -155,7 +221,29 @@ export default function App() {
     padding: 16,
   };
 
-  // безопасно, если nomination вдруг undefined
+  const bottomBar: React.CSSProperties = {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: "12px 16px",
+    background: "rgba(12, 8, 24, 0.92)",
+    borderTop: "1px solid rgba(255,255,255,0.12)",
+    backdropFilter: "blur(10px)",
+    display: "flex",
+    justifyContent: "center",
+    zIndex: 50,
+  };
+
+  const bottomButton: React.CSSProperties = {
+    borderRadius: 999,
+    padding: "10px 16px",
+    fontWeight: 700,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(180, 140, 255, 0.22)",
+    cursor: saving ? "not-allowed" : "pointer",
+  };
+
   if (!nomination) {
     return (
       <div style={containerStyle}>
@@ -165,151 +253,206 @@ export default function App() {
     );
   }
 
-  // ✅ что подсвечиваем визуально: сохранённый, если есть, иначе текущий выбор
-  const highlightedId = savedId ?? selectedId;
+  const chosenTitle =
+    savedId
+      ? nomination.candidates.find((x) => x.id === savedId)?.title ?? savedId
+      : selected
+      ? nomination.candidates.find((x) => x.id === selected)?.title ?? selected
+      : null;
 
   return (
-    <div style={containerStyle}>
-      {/* Верхняя панель */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Bezdarei Award</h1>
-          <div style={{ opacity: 0.75, marginTop: 6 }}>
-            Вопрос {step + 1} из {ballot.length}
+    <>
+      <div style={containerStyle}>
+        {/* Верхняя панель */}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ margin: 0 }}>Bezdarei Award</h1>
+            <div style={{ opacity: 0.75, marginTop: 6 }}>
+              Вопрос {step + 1} из {ballot.length}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {!token ? (
+              <a href={loginUrl}>
+                <button style={{ padding: "10px 14px" }}>Войти через Twitch</button>
+              </a>
+            ) : (
+              <>
+                <div style={{ opacity: 0.85 }}>
+                  {me?.ok ? `${me.user.display_name} (@${me.user.login})` : "…"}
+                </div>
+                <button
+                  style={{ padding: "10px 14px" }}
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    setToken(null);
+                    setMe(null);
+                    setMyVotes({});
+                    setSelected(null);
+                    setLocked(false);
+                  }}
+                >
+                  Выйти
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {!token ? (
-            <a href={loginUrl}>
-              <button style={{ padding: "10px 14px" }}>Войти через Twitch</button>
-            </a>
-          ) : (
-            <>
-              <div style={{ opacity: 0.85 }}>
-                {me?.ok ? `${me.user.display_name} (@${me.user.login})` : "…"}
-              </div>
-              <button
-                style={{ padding: "10px 14px" }}
+        <h2 style={{ textAlign: "center", marginTop: 22 }}>{nomination.title}</h2>
+
+        {/* Карточки 2×2 */}
+        <div style={cardGrid}>
+          {nomination.candidates.map((c) => {
+            const active = highlightedId === c.id;
+
+            // ✅ после сохранения: все НЕвыбранные делаем серыми и некликабельными
+            const dimmed = !!savedId && !active;
+            const disabled = !token || saving || (!!savedId && !active) || locked; // locked=true после голосования
+
+            return (
+              <div
+                key={c.id}
+                style={cardStyle(active, dimmed, disabled)}
                 onClick={() => {
-                  localStorage.removeItem("token");
-                  setToken(null);
-                  setMe(null);
-                  setMyVotes({});
-                  setSelected(null);
+                  if (!canInteract) return;
+                  // если уже есть сохранённый голос — клики запрещены
+                  if (savedId) return;
+                  setSelected(c.id);
                 }}
+                role="button"
+                aria-disabled={disabled}
               >
-                Выйти
-              </button>
-            </>
-          )}
+                {c.title}
+              </div>
+            );
+          })}
         </div>
-      </div>
 
-      <h2 style={{ textAlign: "center", marginTop: 22 }}>{nomination.title}</h2>
+        {/* Панель выбора + кнопки */}
+        <div style={panelStyle}>
+          <div style={{ marginBottom: 10, opacity: 0.85 }}>
+            {savedId ? "Ваш голос зафиксирован:" : "Выберите кандидата:"}
+          </div>
 
-      {/* Карточки 2×2 */}
-      <div style={cardGrid}>
-        {nomination.candidates.map((c) => {
-          const active = highlightedId === c.id;
-          return (
-            <div key={c.id} style={cardStyle(active)} onClick={() => setSelected(c.id)}>
-              {c.title}
-            </div>
-          );
-        })}
-      </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {nomination.candidates.map((c) => {
+              const disabled = !token || saving || !!savedId || locked; // после голосования отключаем
+              return (
+                <label
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    opacity: disabled && (savedId ?? selected) !== c.id ? 0.55 : 1,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name={`nom_${nomination.id}`}
+                    checked={(savedId ?? selected) === c.id}
+                    disabled={disabled}
+                    onChange={() => setSelected(c.id)}
+                  />
+                  <span style={{ fontWeight: 600 }}>{c.title}</span>
+                </label>
+              );
+            })}
+          </div>
 
-      {/* Панель выбора + кнопки */}
-      <div style={panelStyle}>
-        <div style={{ marginBottom: 10, opacity: 0.85 }}>Выберите кандидата:</div>
+          {/* Статус */}
+          <div style={{ marginTop: 12, opacity: 0.8 }}>
+            {!token ? (
+              <>
+                Статус: <b>нужно войти</b>
+              </>
+            ) : savedId ? (
+              <>
+                Статус: <b>сохранено</b> — вы выбрали: <b>{chosenTitle}</b>
+              </>
+            ) : selected ? (
+              hasUnsavedChange ? (
+                <>
+                  Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
+                </>
+              ) : (
+                <>
+                  Статус: <b>выбрано</b>
+                </>
+              )
+            ) : (
+              <>
+                Статус: <b>нет выбора</b>
+              </>
+            )}
+          </div>
 
-        <div style={{ display: "grid", gap: 10 }}>
-          {nomination.candidates.map((c) => (
-            <label
-              key={c.id}
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.10)",
-                cursor: "pointer",
-              }}
+          <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              disabled={!canPrev}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              style={{ padding: "10px 14px" }}
             >
-              <input
-                type="radio"
-                name={`nom_${nomination.id}`}
-                checked={selectedId === c.id}
-                onChange={() => setSelected(c.id)}
-              />
-              <span style={{ fontWeight: 600 }}>{c.title}</span>
-            </label>
-          ))}
+              ← Предыдущий вопрос
+            </button>
+
+            <button
+              disabled={!selected || !token || saving || !!savedId || locked}
+              onClick={() => saveVote(nomination.id, selected!)}
+              style={{ padding: "10px 14px" }}
+            >
+              {saving ? "Сохраняю…" : "Сохранить голос"}
+            </button>
+
+            <button
+              disabled={!canNext}
+              onClick={() => setStep((s) => Math.min(ballot.length - 1, s + 1))}
+              style={{ padding: "10px 14px" }}
+            >
+              Следующий вопрос →
+            </button>
+
+            {!token ? (
+              <div style={{ opacity: 0.8 }}>Чтобы голосовать, нужно войти.</div>
+            ) : savedId ? (
+              <div style={{ opacity: 0.8 }}>
+                Ваш голос: <b>{chosenTitle}</b>
+              </div>
+            ) : selected ? (
+              <div style={{ opacity: 0.8 }}>
+                Текущий выбор: <b>{chosenTitle}</b>
+              </div>
+            ) : (
+              <div style={{ opacity: 0.8 }}>Выберите кандидата</div>
+            )}
+          </div>
         </div>
 
-        {/* Статус сохранения */}
-        <div style={{ marginTop: 12, opacity: 0.8 }}>
-          {!selectedId && !savedId ? (
-            <>
-              Статус: <b>нет выбора</b>
-            </>
-          ) : hasUnsavedChange ? (
-            <>
-              Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
-            </>
-          ) : savedId ? (
-            <>
-              Статус: <b>сохранено</b>
-            </>
-          ) : (
-            <>
-              Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
-            </>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            disabled={!canPrev}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            style={{ padding: "10px 14px" }}
-          >
-            ← Предыдущий вопрос
-          </button>
-
-          <button
-            disabled={!selectedId || !token || saving || !hasUnsavedChange && !!savedId}
-            onClick={() => saveVote(nomination.id, selectedId!)}
-            style={{ padding: "10px 14px" }}
-          >
-            {saving ? "Сохраняю…" : "Сохранить голос"}
-          </button>
-
-          <button
-            disabled={!canNext}
-            onClick={() => setStep((s) => Math.min(ballot.length - 1, s + 1))}
-            style={{ padding: "10px 14px" }}
-          >
-            Следующий вопрос →
-          </button>
-
-          {!token ? (
-            <div style={{ opacity: 0.8 }}>Чтобы голосовать, нужно войти.</div>
-          ) : selectedId ? (
-            <div style={{ opacity: 0.8 }}>
-              Текущий выбор: <b>{nomination.candidates.find((x) => x.id === selectedId)?.title ?? selectedId}</b>
-            </div>
-          ) : savedId ? (
-            <div style={{ opacity: 0.8 }}>
-              Ваш сохранённый выбор: <b>{nomination.candidates.find((x) => x.id === savedId)?.title ?? savedId}</b>
-            </div>
-          ) : (
-            <div style={{ opacity: 0.8 }}>Выберите кандидата</div>
-          )}
-        </div>
+        {/* отступ под фикс-бар */}
+        <div style={{ height: savedId ? 72 : 0 }} />
       </div>
-    </div>
+
+      {/* Нижняя плашка "Изменить голос" */}
+      {token && savedId && (
+        <div style={bottomBar}>
+          <button
+            style={bottomButton}
+            disabled={saving}
+            onClick={() => {
+              // снимаем блокировку через API (отменяем голос)
+              unvote(nomination.id).catch(() => {});
+            }}
+          >
+            {saving ? "Отменяю…" : "Изменить голос"}
+          </button>
+        </div>
+      )}
+    </>
   );
 }
