@@ -130,22 +130,48 @@ export default function App() {
   const canNext = step < ballot.length - 1;
   const hasUnsavedChange = !!selected && selected !== savedForNom;
 
+  // ======= СТИЛИ (всё по центру) =======
+
   const containerStyle: React.CSSProperties = {
     maxWidth: 980,
     margin: "24px auto",
     padding: 16,
     fontFamily: "system-ui",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  };
+
+  const topPanelStyle: React.CSSProperties = {
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    textAlign: "center",
+  };
+
+  const authRowStyle: React.CSSProperties = {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
   };
 
   const cardGrid: React.CSSProperties = {
+    width: "100%",
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: 16,
     marginTop: 16,
     marginBottom: 20,
+    justifyItems: "center",
   };
 
   const cardStyle = (active: boolean): React.CSSProperties => ({
+    width: "100%",
+    maxWidth: 420,
     borderRadius: 16,
     padding: 18,
     border: active ? "2px solid rgba(180, 140, 255, 0.9)" : "1px solid rgba(255,255,255,0.12)",
@@ -163,24 +189,66 @@ export default function App() {
   });
 
   const panelStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 640,
     borderRadius: 16,
     border: "1px solid rgba(255,255,255,0.12)",
     background: "rgba(12, 8, 24, 0.55)",
     padding: 16,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
   };
+
+  const radioListStyle: React.CSSProperties = {
+    width: "100%",
+    display: "grid",
+    gap: 10,
+    justifyItems: "center",
+  };
+
+  const radioItemStyle: React.CSSProperties = {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    gap: 10,
+    alignItems: "center",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.10)",
+    cursor: "pointer",
+    textAlign: "center",
+  };
+
+  const buttonsRowStyle: React.CSSProperties = {
+    display: "flex",
+    gap: 12,
+    marginTop: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    textAlign: "center",
+  };
+
+  // ======= UI =======
+
+  if (!nomination) {
+    return <div style={containerStyle}>Нет данных ballot</div>;
+  }
 
   return (
     <div style={containerStyle}>
       {/* Верхняя панель */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={topPanelStyle}>
         <div>
-          <h1 style={{ margin: 0 }}>Bezdarei Award</h1>
+          <h1 style={{ margin: 0, textAlign: "center" }}>Bezdarei Award</h1>
           <div style={{ opacity: 0.75, marginTop: 6 }}>
             Вопрос {step + 1} из {ballot.length}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={authRowStyle}>
           {!token ? (
             <a href={loginUrl}>
               <button style={{ padding: "10px 14px" }}>Войти через Twitch</button>
@@ -226,20 +294,9 @@ export default function App() {
       <div style={panelStyle}>
         <div style={{ marginBottom: 10, opacity: 0.85 }}>Выберите кандидата:</div>
 
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={radioListStyle}>
           {nomination.candidates.map((c) => (
-            <label
-              key={c.id}
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.10)",
-                cursor: "pointer",
-              }}
-            >
+            <label key={c.id} style={radioItemStyle}>
               <input
                 type="radio"
                 name={`nom_${nomination.id}`}
@@ -274,7 +331,7 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={buttonsRowStyle}>
           <button
             disabled={!canPrev}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
