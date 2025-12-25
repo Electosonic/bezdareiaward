@@ -1,21 +1,15 @@
-export type Candidate = { id: string; title: string; url?: string };
+export type Candidate = { id: string; title: string; image?: string };
 export type Nomination = { id: string; title: string; candidates: Candidate[] };
 
 export const ballot: Nomination[] = [
   {
-    id: "clip_of_year",
-    title: "Клип года",
+    id: "zavoz_goda",
+    title: "Завоз года — кандидаты",
     candidates: [
-      { id: "clip_1", title: "Клип #1", url: "https://example.com" },
-      { id: "clip_2", title: "Клип #2", url: "https://example.com" },
-    ],
-  },
-  {
-    id: "streamer_of_year",
-    title: "Стример года",
-    candidates: [
-      { id: "s1", title: "Streamer One" },
-      { id: "s2", title: "Streamer Two" },
+      { id: "iris", title: "Браки в Ирисе", image: "/cat.png" },
+      { id: "sab", title: "Веном в САБчате", image: "/cat.png" },
+      { id: "blur", title: "Блюр Лизы в фильме", image: "/cat.png" },
+      { id: "tulpa", title: '"Тульпа" Вики', image: "/cat.png" },
     ],
   },
 ];
