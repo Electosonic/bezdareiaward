@@ -18,15 +18,9 @@ export default function App() {
   const [token, setToken] = useState<string | null>(getToken());
   const [me, setMe] = useState<MeResponse | null>(null);
 
-  // сохранённые голоса из базы
   const [myVotes, setMyVotes] = useState<Record<string, string>>({});
-
-  // текущий экран (вопрос)
   const [step, setStep] = useState(0);
-
-  // текущий выбор на экране (может отличаться от сохранённого)
   const [selected, setSelected] = useState<string | null>(null);
-
   const [saving, setSaving] = useState(false);
 
   const nomination = ballot[Math.max(0, Math.min(step, ballot.length - 1))];
@@ -50,7 +44,7 @@ export default function App() {
     return u.toString();
   }, []);
 
-  // профайл
+  // профиль
   useEffect(() => {
     if (!token) return;
     fetch(`${WORKER_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } })
@@ -59,18 +53,22 @@ export default function App() {
       .catch(() => setMe({ ok: false, error: "network_error" }));
   }, [token]);
 
+  async function loadMyVotes(t: string) {
+    const r = await fetch(`${WORKER_URL}/api/my-votes`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    const data: MyVotesResponse = await r.json();
+    if (!data.ok) return;
+
+    const map: Record<string, string> = {};
+    for (const v of data.votes) map[v.nomination_id] = v.candidate_id;
+    setMyVotes(map);
+  }
+
   // мои голоса
   useEffect(() => {
     if (!token) return;
-    fetch(`${WORKER_URL}/api/my-votes`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((data: MyVotesResponse) => {
-        if (!data.ok) return;
-        const map: Record<string, string> = {};
-        for (const v of data.votes) map[v.nomination_id] = v.candidate_id;
-        setMyVotes(map);
-      })
-      .catch(() => {});
+    loadMyVotes(token).catch(() => {});
   }, [token]);
 
   // при смене шага — выставляем selected в сохранённый выбор (или null)
@@ -95,8 +93,12 @@ export default function App() {
       const data = await r.json();
       if (!data.ok) return alert(`Ошибка: ${data.error ?? "unknown"}`);
 
-      // обновляем локально сохранённые голоса
+      // моментально обновим локально
       setMyVotes((prev) => ({ ...prev, [nomination_id]: candidate_id }));
+      setSelected(candidate_id);
+
+      // и синхронизируемся с базой (чтобы статус точно стал "сохранено")
+      await loadMyVotes(token);
     } finally {
       setSaving(false);
     }
@@ -104,7 +106,6 @@ export default function App() {
 
   const canPrev = step > 0;
   const canNext = step < ballot.length - 1;
-
   const hasUnsavedChange = !!selected && selected !== savedForNom;
 
   const containerStyle: React.CSSProperties = {
@@ -131,19 +132,13 @@ export default function App() {
     cursor: "pointer",
     minHeight: 170,
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    textAlign: "center",
+    fontWeight: 700,
+    lineHeight: 1.2,
+    fontSize: 18,
   });
-
-  const imgStyle: React.CSSProperties = {
-    width: 92,
-    height: 92,
-    borderRadius: 16,
-    objectFit: "cover",
-    background: "rgba(180, 140, 255, 0.25)",
-  };
 
   const panelStyle: React.CSSProperties = {
     borderRadius: 16,
@@ -197,22 +192,8 @@ export default function App() {
         {nomination.candidates.map((c) => {
           const active = selected === c.id;
           return (
-            <div
-              key={c.id}
-              style={cardStyle(active)}
-              onClick={() => setSelected(c.id)}
-              role="button"
-              tabIndex={0}
-            >
-              <img
-                src={c.image ?? "/cat.png"}
-                alt={c.title}
-                style={imgStyle}
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-              <div style={{ fontWeight: 700, textAlign: "center" }}>{c.title}</div>
+            <div key={c.id} style={cardStyle(active)} onClick={() => setSelected(c.id)}>
+              {c.title}
             </div>
           );
         })}
@@ -251,14 +232,22 @@ export default function App() {
         <div style={{ marginTop: 12, opacity: 0.8 }}>
           {savedForNom ? (
             hasUnsavedChange ? (
-              <>Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)</>
+              <>
+                Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
+              </>
             ) : (
-              <>Статус: <b>сохранено</b></>
+              <>
+                Статус: <b>сохранено</b>
+              </>
             )
           ) : selected ? (
-            <>Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)</>
+            <>
+              Статус: <b>не сохранено</b> (нажмите “Сохранить голос”)
+            </>
           ) : (
-            <>Статус: <b>нет выбора</b></>
+            <>
+              Статус: <b>нет выбора</b>
+            </>
           )}
         </div>
 
@@ -291,8 +280,7 @@ export default function App() {
             <div style={{ opacity: 0.8 }}>Чтобы голосовать, нужно войти.</div>
           ) : selected ? (
             <div style={{ opacity: 0.8 }}>
-              Текущий выбор:{" "}
-              <b>{nomination.candidates.find((x) => x.id === selected)?.title ?? selected}</b>
+              Текущий выбор: <b>{nomination.candidates.find((x) => x.id === selected)?.title ?? selected}</b>
             </div>
           ) : (
             <div style={{ opacity: 0.8 }}>Выберите кандидата</div>

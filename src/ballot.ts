@@ -1,4 +1,4 @@
-export type Candidate = { id: string; title: string; image?: string };
+export type Candidate = { id: string; title: string };
 export type Nomination = { id: string; title: string; candidates: Candidate[] };
 
 export const ballot: Nomination[] = [
@@ -7,9 +7,9 @@ export const ballot: Nomination[] = [
     title: "Завоз года — кандидаты",
     candidates: [
       { id: "iris", title: "Браки в Ирисе" },
-      { id: "sab", title: "Веном в САБчате",},
-      { id: "blur", title: "Блюр Лизы в фильме", },
-      { id: "tulpa", title: '"Тульпа" Вики', },
+      { id: "sab", title: "Веном в САБчате" },
+      { id: "blur", title: "Блюр Лизы в фильме" },
+      { id: "tulpa", title: '"Тульпа" Вики' },
     ],
   },
 ];
